@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import CalibrationOverlay from './components/CalibrationOverlay.jsx'
+import GazeHighlightOverlay from './components/GazeHighlightOverlay.jsx'
 import Controls from './components/Controls.jsx'
 import GazeTracker from './components/GazeTracker.jsx'
 import PdfViewer from './components/PdfViewer.jsx'
@@ -9,7 +11,7 @@ import { useTextLayerRects } from './hooks/useTextLayerRects.js'
 import { useWebGazer } from './hooks/useWebGazer.js'
 
 const DEFAULT_DWELL_TIME = 800
-const DEFAULT_TOLERANCE = 10
+const DEFAULT_TOLERANCE = 32
 
 function App() {
   const viewerRef = useRef(null)
@@ -18,8 +20,17 @@ function App() {
   const [pageNumber, setPageNumber] = useState(1)
   const [scale, setScale] = useState(1.1)
   const [textLayerVersion, setTextLayerVersion] = useState(0)
+  const [isCalibrating, setIsCalibrating] = useState(false)
 
-  const { gazePoint, isTracking, status, error, start, stop } = useWebGazer()
+  const {
+    gazePoint,
+    isTracking,
+    status,
+    error,
+    recordCalibrationPoint,
+    start,
+    stop,
+  } = useWebGazer()
   const { rects, recalculate, lastMeasuredAt } = useTextLayerRects(
     viewerRef,
     `${pageNumber}-${scale}-${textLayerVersion}`,
@@ -52,6 +63,18 @@ function App() {
     setNumPages(null)
     clearHighlights()
     window.setTimeout(recalculate, 500)
+  }
+
+  const handleStartTracking = async () => {
+    const started = await start()
+    if (started) {
+      setIsCalibrating(true)
+    }
+  }
+
+  const handleStopTracking = () => {
+    setIsCalibrating(false)
+    stop()
   }
 
   useEffect(() => {
@@ -98,6 +121,7 @@ function App() {
           currentTarget={currentTarget}
           highlightedCount={highlightedIds.size}
           rectCount={rects.length}
+          hasPdf={Boolean(pdfFile)}
           status={status}
           error={error}
           lastMeasuredAt={lastMeasuredAt}
@@ -105,9 +129,10 @@ function App() {
 
         <Controls
           isTracking={isTracking}
-          onStart={start}
-          onStop={stop}
+          onStart={handleStartTracking}
+          onStop={handleStopTracking}
           onRecalculate={recalculate}
+          onCalibrate={() => setIsCalibrating(true)}
           onFileChange={handleFileChange}
           onClearHighlights={clearHighlights}
         />
@@ -127,6 +152,16 @@ function App() {
       </aside>
 
       <GazeTracker gazePoint={gazePoint} isTracking={isTracking} />
+      <GazeHighlightOverlay
+        currentTarget={currentTarget}
+        highlightedTexts={highlightedTexts}
+      />
+      <CalibrationOverlay
+        visible={isCalibrating}
+        onRecord={recordCalibrationPoint}
+        onComplete={() => setIsCalibrating(false)}
+        onSkip={() => setIsCalibrating(false)}
+      />
     </main>
   )
 }

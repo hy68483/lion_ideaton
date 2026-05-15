@@ -5,6 +5,7 @@ import {
   Pause,
   Play,
   RefreshCw,
+  Target,
 } from 'lucide-react'
 
 export default function Controls({
@@ -12,6 +13,7 @@ export default function Controls({
   onStart,
   onStop,
   onRecalculate,
+  onCalibrate,
   onFileChange,
   onClearHighlights,
 }) {
@@ -35,6 +37,11 @@ export default function Controls({
         <button type="button" onClick={onRecalculate}>
           <RefreshCw size={18} />
           Text Layer 좌표 재계산
+        </button>
+
+        <button type="button" onClick={onCalibrate} disabled={!isTracking}>
+          <Target size={18} />
+          시선 보정 다시하기
         </button>
 
         <button type="button" onClick={onClearHighlights}>

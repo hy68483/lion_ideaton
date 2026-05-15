@@ -5,10 +5,17 @@ export default function ReadingStatusPanel({
   currentTarget,
   highlightedCount,
   rectCount,
+  hasPdf,
   status,
   error,
   lastMeasuredAt,
 }) {
+  const currentText =
+    currentTarget?.text ||
+    (hasPdf && rectCount === 0
+      ? '텍스트 레이어가 없습니다. 스캔 이미지 PDF이면 텍스트를 추출할 수 없습니다.'
+      : '-')
+
   return (
     <section className="panel status-panel" aria-label="Reading status">
       <div className="panel-heading">
@@ -29,7 +36,7 @@ export default function ReadingStatusPanel({
           <Eye size={17} />
           <div>
             <span>현재 바라보는 텍스트</span>
-            <strong className="current-text">{currentTarget?.text || '-'}</strong>
+            <strong className="current-text">{currentText}</strong>
           </div>
         </div>
 

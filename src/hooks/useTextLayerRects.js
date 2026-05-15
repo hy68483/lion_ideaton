@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const TEXT_LAYER_SELECTOR = '.react-pdf__Page__textContent span'
+const TEXT_LAYER_SELECTOR =
+  '.react-pdf__Page__textContent span, .textLayer span, [data-gaze-text-id]'
 
 export function useTextLayerRects(viewerRef, dependencyKey = '') {
   const retryRef = useRef(null)

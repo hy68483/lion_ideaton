@@ -24,6 +24,7 @@ export function useDwellHighlight({
   )
 
   const currentTargetId = currentTarget?.id || null
+  const gazeTimestamp = gazePoint?.timestamp ?? 0
 
   useEffect(() => {
     if (!currentTargetId) {
@@ -52,7 +53,7 @@ export function useDwellHighlight({
         })
       }, 0)
     }
-  }, [dwellTime, currentTargetId])
+  }, [dwellTime, currentTargetId, gazeTimestamp])
 
   const highlightedTexts = useMemo(
     () => textRects.filter((rect) => highlightedIds.has(rect.id)),
