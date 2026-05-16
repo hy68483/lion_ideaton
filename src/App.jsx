@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import CalibrationOverlay from './components/CalibrationOverlay.jsx'
 import GazeHighlightOverlay from './components/GazeHighlightOverlay.jsx'
@@ -10,8 +10,10 @@ import { useDwellHighlight } from './hooks/useDwellHighlight.js'
 import { useTextLayerRects } from './hooks/useTextLayerRects.js'
 import { useWebGazer } from './hooks/useWebGazer.js'
 
-const DEFAULT_DWELL_TIME = 800
-const DEFAULT_TOLERANCE = 32
+const DEFAULT_DWELL_TIME = 700
+const DEFAULT_TOLERANCE = 85
+const DEFAULT_TARGET_HOLD_TIME = 80
+const READING_MODE_SCALE = 1.45
 
 function App() {
   const viewerRef = useRef(null)
@@ -19,21 +21,24 @@ function App() {
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [scale, setScale] = useState(1.1)
-  const [textLayerVersion, setTextLayerVersion] = useState(0)
   const [isCalibrating, setIsCalibrating] = useState(false)
+  const [isFocusMode, setIsFocusMode] = useState(false)
+  const [focusEffect, setFocusEffect] = useState('mosaic')
 
   const {
     gazePoint,
     isTracking,
     status,
     error,
+    trackerInfo,
     recordCalibrationPoint,
+    resetCalibration,
     start,
     stop,
   } = useWebGazer()
   const { rects, recalculate, lastMeasuredAt } = useTextLayerRects(
     viewerRef,
-    `${pageNumber}-${scale}-${textLayerVersion}`,
+    `${pageNumber}-${scale}-${Boolean(pdfFile)}`,
   )
 
   const {
@@ -47,14 +52,18 @@ function App() {
     textRects: rects,
     dwellTime: DEFAULT_DWELL_TIME,
     tolerance: DEFAULT_TOLERANCE,
+    holdTime: DEFAULT_TARGET_HOLD_TIME,
+    disabled: isCalibrating,
   })
 
   const highlightedPreview = useMemo(
     () => highlightedTexts.slice(-5).map((item) => item.text),
     [highlightedTexts],
   )
+  const canUseFocusMode = Boolean(pdfFile && isTracking && !isCalibrating)
+  const isReadingMode = Boolean(canUseFocusMode && isFocusMode)
 
-  const handleFileChange = (event) => {
+  const handleFileChange = useCallback((event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -62,20 +71,64 @@ function App() {
     setPageNumber(1)
     setNumPages(null)
     clearHighlights()
+    if (isTracking && !isCalibrating) {
+      setIsFocusMode(true)
+      setScale((currentScale) => Math.max(currentScale, READING_MODE_SCALE))
+    }
     window.setTimeout(recalculate, 500)
-  }
+  }, [clearHighlights, isCalibrating, isTracking, recalculate])
+
+  const handlePdfLoadSuccess = useCallback(
+    ({ numPages: loadedPages }) => {
+      setNumPages(loadedPages)
+      window.setTimeout(recalculate, 150)
+    },
+    [recalculate],
+  )
+
+  const handlePdfRenderSuccess = useCallback(() => {
+    window.setTimeout(recalculate, 150)
+  }, [recalculate])
+
+  const handlePageChange = useCallback(
+    (nextPage) => {
+      setPageNumber(nextPage)
+      window.setTimeout(recalculate, 250)
+    },
+    [recalculate],
+  )
+
+  const handleScaleChange = useCallback(
+    (nextScale) => {
+      setScale(Number(nextScale.toFixed(2)))
+      window.setTimeout(recalculate, 250)
+    },
+    [recalculate],
+  )
 
   const handleStartTracking = async () => {
     const started = await start()
     if (started) {
+      resetCalibration()
       setIsCalibrating(true)
     }
   }
 
   const handleStopTracking = () => {
     setIsCalibrating(false)
+    setIsFocusMode(false)
     stop()
   }
+
+  const handleFinishCalibration = useCallback(() => {
+    setIsCalibrating(false)
+
+    if (pdfFile) {
+      setIsFocusMode(true)
+      setScale((currentScale) => Math.max(currentScale, READING_MODE_SCALE))
+      window.setTimeout(recalculate, 250)
+    }
+  }, [pdfFile, recalculate])
 
   useEffect(() => {
     const viewer = viewerRef.current
@@ -83,36 +136,27 @@ function App() {
 
     // React-PDF text layer span에 상태 class를 반영해 하이라이트를 직접 표시한다.
     viewer.querySelectorAll('[data-gaze-text-id]').forEach((span) => {
-      const id = span.dataset.gazeTextId
-      span.classList.toggle('gaze-current-text', id === currentTargetId)
-      span.classList.toggle('gaze-highlighted-text', highlightedIds.has(id))
+      const lineId = span.dataset.gazeLineId
+      const isCurrent = !isCalibrating && lineId === currentTargetId
+      const isHighlighted = !isCalibrating && highlightedIds.has(lineId)
+
+      span.classList.toggle('gaze-current-text', isCurrent)
+      span.classList.toggle('gaze-highlighted-text', isHighlighted)
     })
-  }, [currentTargetId, highlightedIds, rects])
+  }, [currentTargetId, highlightedIds, isCalibrating, rects])
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell${isReadingMode ? ' app-shell-reading' : ''}`}>
       <PdfViewer
         ref={viewerRef}
         file={pdfFile}
         pageNumber={pageNumber}
         numPages={numPages}
         scale={scale}
-        onLoadSuccess={({ numPages: loadedPages }) => {
-          setNumPages(loadedPages)
-          setTextLayerVersion((version) => version + 1)
-        }}
-        onRenderSuccess={() => {
-          setTextLayerVersion((version) => version + 1)
-          window.setTimeout(recalculate, 150)
-        }}
-        onPageChange={(nextPage) => {
-          setPageNumber(nextPage)
-          window.setTimeout(recalculate, 250)
-        }}
-        onScaleChange={(nextScale) => {
-          setScale(Number(nextScale.toFixed(2)))
-          window.setTimeout(recalculate, 250)
-        }}
+        onLoadSuccess={handlePdfLoadSuccess}
+        onRenderSuccess={handlePdfRenderSuccess}
+        onPageChange={handlePageChange}
+        onScaleChange={handleScaleChange}
       />
 
       <aside className="side-rail">
@@ -125,6 +169,7 @@ function App() {
           status={status}
           error={error}
           lastMeasuredAt={lastMeasuredAt}
+          trackerInfo={trackerInfo}
         />
 
         <Controls
@@ -132,9 +177,15 @@ function App() {
           onStart={handleStartTracking}
           onStop={handleStopTracking}
           onRecalculate={recalculate}
-          onCalibrate={() => setIsCalibrating(true)}
+          onCalibrate={() => {
+            resetCalibration()
+            setIsFocusMode(false)
+            setIsCalibrating(true)
+          }}
           onFileChange={handleFileChange}
           onClearHighlights={clearHighlights}
+          focusEffect={focusEffect}
+          onFocusEffectChange={setFocusEffect}
         />
 
         <section className="panel preview-panel" aria-label="최근 하이라이트">
@@ -151,16 +202,27 @@ function App() {
         </section>
       </aside>
 
+      {canUseFocusMode && (
+        <button
+          type="button"
+          className="study-mode-button"
+          onClick={() => setIsFocusMode((current) => !current)}
+        >
+          {isReadingMode ? '패널 보기' : '공부 모드'}
+        </button>
+      )}
+
       <GazeTracker gazePoint={gazePoint} isTracking={isTracking} />
       <GazeHighlightOverlay
-        currentTarget={currentTarget}
-        highlightedTexts={highlightedTexts}
+        currentTarget={isCalibrating ? null : currentTarget}
+        highlightedTexts={isCalibrating ? [] : highlightedTexts}
+        focusEffect={focusEffect}
       />
       <CalibrationOverlay
         visible={isCalibrating}
         onRecord={recordCalibrationPoint}
-        onComplete={() => setIsCalibrating(false)}
-        onSkip={() => setIsCalibrating(false)}
+        onComplete={handleFinishCalibration}
+        onSkip={handleFinishCalibration}
       />
     </main>
   )

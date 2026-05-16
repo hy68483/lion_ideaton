@@ -11,7 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.35",
     "lucide-react": "^0.468.0",
+    "onnxruntime-web": "^1.26.0",
     "pdfjs-dist": "4.8.69",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

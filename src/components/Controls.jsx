@@ -8,6 +8,12 @@ import {
   Target,
 } from 'lucide-react'
 
+const FOCUS_EFFECT_OPTIONS = [
+  { value: 'mosaic', label: '모자이크' },
+  { value: 'blur', label: '블러' },
+  { value: 'highlight', label: '표시만' },
+]
+
 export default function Controls({
   isTracking,
   onStart,
@@ -16,9 +22,11 @@ export default function Controls({
   onCalibrate,
   onFileChange,
   onClearHighlights,
+  focusEffect,
+  onFocusEffectChange,
 }) {
   return (
-    <section className="panel controls-panel" aria-label="PDF reader controls">
+    <section className="panel controls-panel" aria-label="PDF gaze controls">
       <div className="panel-heading">
         <Crosshair size={18} />
         <h2>컨트롤</h2>
@@ -31,7 +39,7 @@ export default function Controls({
           onClick={isTracking ? onStop : onStart}
         >
           {isTracking ? <Pause size={18} /> : <Play size={18} />}
-          {isTracking ? 'WebGazer 중지' : 'WebGazer 시작'}
+          {isTracking ? '추적 중지' : 'MediaPipe 추적 시작'}
         </button>
 
         <button type="button" onClick={onRecalculate}>
@@ -48,6 +56,23 @@ export default function Controls({
           <Highlighter size={18} />
           하이라이트 초기화
         </button>
+
+        <div className="effect-control">
+          <span>보고 있는 영역 처리</span>
+          <div className="effect-options" role="group" aria-label="보고 있는 영역 처리">
+            {FOCUS_EFFECT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={focusEffect === option.value ? 'effect-option-active' : ''}
+                aria-pressed={focusEffect === option.value}
+                onClick={() => onFocusEffectChange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="file-control">
           <FileUp size={18} />

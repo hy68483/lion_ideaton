@@ -52,7 +52,7 @@ const PdfViewer = forwardRef(function PdfViewer(
           <button
             type="button"
             aria-label="확대"
-            onClick={() => onScaleChange(Math.min(1.8, scale + 0.1))}
+            onClick={() => onScaleChange(Math.min(2.4, scale + 0.1))}
           >
             <ZoomIn size={18} />
           </button>
